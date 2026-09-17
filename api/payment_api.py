@@ -5,37 +5,39 @@
 
 
 from fastapi import APIRouter, Depends
-from model.payment_model import PaymentCreateRequest, PaymentResponseData
+from model.payment_model import PaymentCreateRequest
 from service.payment_service import PaymentService
 from utils.auth import get_current_user
 from utils.response import BaseResponse
+from utils.logger import logger
+
+
+
 
 router = APIRouter(prefix="/payments", tags=["Payment Management"])
 
 
-@router.post("", response_model=BaseResponse[PaymentResponseData])
-def create_payment_api(
-    data: PaymentCreateRequest,
-    current_user: str = Depends(get_current_user)  # Requires JWT Authentication
-):
+
+
+
+@router.post("", response_model=BaseResponse)
+def pay_order_api(data: PaymentCreateRequest, current_user: str = Depends(get_current_user)):
     """
-    **Execute Order Payment**:
-    - Verifies order ownership and checks if status is `PENDING_PAY`.
-    - Inserts transaction record into `payments` table.
-    - Updates order status to `PAID`.
+    **Process Order Payment**:
+    - Validates order ownership, PENDING_PAY status, and payment amount.
+    - Records successful payment transaction and updates order status to `PAID`.
     - **Requires JWT Bearer Token**.
     """
-    return PaymentService.process_payment(username=current_user, data=data)
+    logger.info(f"API Request: Payment requested for order ID '{data.order_id}' by user: {current_user}")
+    return PaymentService.pay_order(username=current_user, data=data)
 
 
 @router.get("/{order_id}", response_model=BaseResponse)
-def get_payment_detail_api(
-    order_id: str,
-    current_user: str = Depends(get_current_user)  # Requires JWT Authentication
-):
+def get_payment_records_api(order_id: str, current_user: str = Depends(get_current_user)):
     """
-    **Query Payment Transaction**:
-    - Fetches payment details for a specific `order_id`.
+    **Get Payment Records**:
+    - Retrieves payment history associated with the given order ID.
     - **Requires JWT Bearer Token**.
     """
-    return PaymentService.get_payment_info(username=current_user, order_id=order_id)
+    logger.info(f"API Request: Get payment records for order ID '{order_id}' by user: {current_user}")
+    return PaymentService.get_payments(order_id=order_id)

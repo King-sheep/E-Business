@@ -36,5 +36,5 @@ def register_api(data:RegisterRequest):
         )
 
     return BaseResponse(
-        code=200, msg=result["msg"], data=result["data"]
+        code=200, msg=result.get("msg", "success"), data=result.get("data")
     )

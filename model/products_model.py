@@ -4,54 +4,59 @@
 # @Description: products_model.py
 
 
-from pydantic import BaseModel
-from typing import Generic, TypeVar
+from pydantic import BaseModel, BeforeValidator
+from typing import Optional, List, Annotated, Any
 
 
 
 
-# Request -------------------------------------------------------------------------------------------
-# Base Class
+# 1. Define a centralized helper function to clean empty strings/lists into None
+def convert_empty_to_none(v: Any) -> Any:
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    if isinstance(v, (list, dict, set)) and len(v) == 0:
+        return None
+    return v
+
+# 2. Create strict typed annotated aliases for optional fields
+# These keep strict types (str, float, int) for OpenAPI/IDE, but safely pre-process "" -> None
+OptionalStr = Annotated[str | None, BeforeValidator(convert_empty_to_none)]
+OptionalFloat = Annotated[float | None, BeforeValidator(convert_empty_to_none)]
+OptionalInt = Annotated[int | None, BeforeValidator(convert_empty_to_none)]
+OptionalIds = Annotated[list[int] | None, BeforeValidator(convert_empty_to_none)]
+
+
+# ==========================================
+# Request Models
+# ==========================================
+
+# Base Class with strict types, but safely handles empty inputs
 class ProductBase(BaseModel):
-    name: str | None = None
-    price: float | None = None
-    stock: int | None = None
-    description: str | None = None
+    name: OptionalStr = None
+    price: OptionalFloat = None
+    stock: OptionalInt = None
+    description: OptionalStr = None
 
 
-# Request model of insert data
+# Request model for creating a new product (Strictly requires valid types)
 class ProductCreate(ProductBase):
-    name: str
-    price: float
-    stock: int = 0
+    name: str  # Required for creation
+    price: float  # Required for creation
+    stock: int = 1
 
 
-# Request model of update data
-class ProductsRequestUpdate(BaseModel):
+# Request model for updating an existing product
+class ProductsRequestUpdate(ProductBase):
     id: int
 
 
-# Request model of delect data
-class ProductQuery(BaseModel):
-    ids: list[int]
+# Request model for querying products (All fields strict yet optional for full scan)
+class ProductQuery(ProductBase):
+    ids: OptionalIds = None
 
 
-
-# Respons -------------------------------------------------------------------------------------------
-# # Defined a typevar
-# T = TypeVar("T")
-
-
-# # Base response
-# class BaseResponse(BaseModel, Generic[T]):
-#     code: int = 200
-#     msg: str = "success"
-#     data: T | None = None  # Data is typevar
-
-# #Success
-# def success(data: T | None = None, msg: str = "Opration Successful") -> dict:
-#     return BaseModel[T](code=200, msg=msg, data=data).model_dump()
-
-# #Failed
-# def fail(msg: str = "Opration Failed", code = 400) -> dict:
-#     return BaseModel[T](code=200, msg=msg, data=None).model_dump()
+# Request Model for Deleting Products
+class ProductDelete(BaseModel):
+    # Use the clean annotated type to ensure ids is a list of integers, 
+    # and safely handle empty inputs like [] or "" -> None
+    ids: OptionalIds = None

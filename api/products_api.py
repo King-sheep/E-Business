@@ -6,7 +6,7 @@
 
 
 from fastapi import APIRouter, Depends
-from model.products_model import ProductCreate, ProductsRequestUpdate, ProductQuery
+from model.products_model import ProductCreate, ProductsRequestUpdate, ProductQuery, ProductDelete
 from service.products_service import ProductsService
 from utils.response import BaseResponse
 from utils.auth import get_current_user
@@ -70,18 +70,25 @@ def update_product_api(
     return res
 
 
-# 4.Delete product
+# 4. Delete product
 @router.delete("/del", response_model=BaseResponse)
 def delete_products_api(
-    ids: list[int],
-    current_user: str=Depends(get_current_user)
+    body: ProductDelete,  # 改为接收 ProductDelete 模型对象
+    current_user: str = Depends(get_current_user)
 ):
     """
     **Batch Delete Products**:
     - Deletes one or multiple products by their unique IDs.
     - **Requires JWT Bearer Token** in Authorization header.
     """
-    logger.info(f"API Request: Batch delete products with IDs {ids} requested by user: {current_user}")
-    res = ProductsService.del_product(ids)
-    logger.info(f"API Response: Batch delete completed for IDs {ids}.")
+    # Defensive check: Ensure IDs are provided after model pre-validation
+    if not body.ids:
+        return BaseResponse(code=400, msg="Product IDs list cannot be empty", data=None)
+
+    logger.info(f"API Request: Batch delete products with IDs {body.ids} requested by user: {current_user}")
+    
+    # Pass clean list[int] to service layer
+    res = ProductsService.del_product(body.ids)
+    
+    logger.info(f"API Response: Batch delete completed for IDs {body.ids}.")
     return res

@@ -22,7 +22,8 @@ class RegisterService:
             return {
                 "success": False,
                 "code": 400,
-                "msg": f"username '{data.username}' is exist, pls choose another username"
+                "msg": f"username '{data.username}' is exist, pls choose another username",
+                "data": None
             }
 
 
@@ -33,5 +34,7 @@ class RegisterService:
         return {
             "success": True,
             "code": 200,
-            "msg": {"user_id": new_user_id, "username": data.username}
+            "msg": "Registration successful",
+            "data": {"user_id": new_user_id, "username": data.username}
+
         }

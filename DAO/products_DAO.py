@@ -20,42 +20,40 @@ class ProductsDAO:
 
     # Select products sql
     @staticmethod
-    def select_product(query: ProductQuery):
-        # Base sql
-        sql = "SELECT id, name, price, stock, description, create_time FROM products"
-
-        # Which conditions be contained
-        where_clauses = []
+    def select_product(query: ProductQuery) -> list:
+        """
+        Query products based on dynamic filters (supports partial filters or full scan if all are None).
+        """
+        sql = "SELECT * FROM products WHERE 1=1"
         params = []
 
-        # Get data of Model
+        # 1. Check if name filter is provided
         if query.name is not None and query.name.strip() != "":
-            where_clauses.append("name like %s")
-            params.append(f"%{query.name}%")
+            sql += " AND name LIKE %s"
+            params.append(f"%{query.name.strip()}%")
 
+        # 2. Check if ids filter is provided
+        if query.ids is not None and len(query.ids) > 0:
+            # Using FIND_IN_SET or IN clause for list of IDs
+            format_strings = ','.join(['%s'] * len(query.ids))
+            sql += f" AND id IN ({format_strings})"
+            params.extend(query.ids)
+
+        # 3. Check price filter if needed
         if query.price is not None:
-            where_clauses.append("price = %s")
+            sql += " AND price = %s"
             params.append(query.price)
 
-        if query.stock is not None:
-            where_clauses.append("stock = %s")
-            params.append(query.stock)
-
-        # SQL concatenation
-        if where_clauses:
-            sql += " where " + " and ".join(where_clauses)
-
-        sql += " order by id DESC"
-
-        conn = get_db_connection()
+        # Execute query (make sure it's cursor.execute)
+        connection = get_db_connection()  # get DB connection
+        cursor = connection.cursor()      # Creat cursor
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(sql, tuple(params))
-                return cursor.fetchall()
-
+            cursor.execute(sql, tuple(params))
+            result = cursor.fetchall()
+            return result
         finally:
-            conn.close()
-
+            cursor.close()
+            connection.close()
 
 
     # Create new data
@@ -70,7 +68,7 @@ class ProductsDAO:
         #Run sql to insert data
         try:
             with conn.cursor() as cursor:
-                cursor.execution(sql, tuple(params))
+                cursor.execute(sql, tuple(params))
                 conn.commit()                                  # Submit data
                 return cursor.lastrowid                        # Return inserted data
 

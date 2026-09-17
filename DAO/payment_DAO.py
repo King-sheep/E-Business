@@ -4,6 +4,8 @@
 # @Description: payment_DAO.py
 
 
+from datetime import datetime
+import uuid
 from utils.DB_utils import get_db_connection
 
 
@@ -12,57 +14,67 @@ from utils.DB_utils import get_db_connection
 class PaymentDAO:
 
     @staticmethod
-    def execute_payment_transaction(order_id: str, username: str, payment_method: str) -> dict | None:
+    def process_payment_transaction(username: str, order_id: str, payment_method: str, payment_amount: float) -> bool:
         """
         Executes payment within a database transaction:
-        1. Locks order row and verifies it belongs to current user with 'PENDING_PAY' status.
-        2. Retrieves total_amount from `orders` table.
-        3. Inserts payment details into `payments` table.
-        4. Updates order status to 'PAID' in `orders` table.
+        1. Resolves user_id from username.
+        2. Locks the order (FOR UPDATE) and checks its existence, ownership, and PENDING_PAY status.
+        3. Validates if payment_amount matches order total_amount.
+        4. Inserts a record into `payments` table.
+        5. Updates `orders` status to `PAID`.
         """
         conn = get_db_connection()
         try:
-            conn.autocommit(False)
             with conn.cursor() as cursor:
-                # Step 1: Lock order record for validation (FOR UPDATE)
+                # 1. Get user_id from users table
+                cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+                user_record = cursor.fetchone()
+                if not user_record:
+                    conn.rollback()
+                    return False
+                user_id = user_record["id"]
+
+                # 2. Fetch and lock the order
                 cursor.execute(
-                    "SELECT total_amount, status FROM orders WHERE order_id = %s AND username = %s FOR UPDATE",
-                    (order_id, username)
+                    "SELECT total_amount, status FROM orders WHERE order_id = %s AND user_id = %s FOR UPDATE",
+                    (order_id, user_id)
                 )
                 order = cursor.fetchone()
 
-                # Validation fails if order doesn't exist or isn't in PENDING_PAY state
-                if not order or order["status"] != "PENDING_PAY":
+                if not order:
                     conn.rollback()
-                    return None
+                    return False  # Order not found or not owned by user
 
-                payment_amount = float(order["total_amount"])
+                if order["status"] != "PENDING_PAY":
+                    conn.rollback()
+                    return False  # Order already paid or cancelled
 
-                # Step 2: Insert new record into payments table
+                # 3. Validate payment amount
+                expected_amount = float(order["total_amount"])
+                if abs(expected_amount - payment_amount) > 1e-6:
+                    conn.rollback()
+                    return False  # Amount mismatch
+
+                # 4. Generate mock third-party transaction id
+                transaction_id = f"TXN{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
+
+                # 5. Insert into payments table
                 cursor.execute(
                     """
-                    INSERT INTO payments (order_id, payment_amount, payment_method, status)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO payments (order_id, payment_amount, payment_method, status, transaction_id, paid_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
                     """,
-                    (order_id, payment_amount, payment_method, "SUCCESS")
+                    (order_id, payment_amount, payment_method, "SUCCESS", transaction_id)
                 )
-                payment_id = cursor.lastrowid
 
-                # Step 3: Update orders status to PAID
+                # 6. Update order status to PAID
                 cursor.execute(
                     "UPDATE orders SET status = %s WHERE order_id = %s",
                     ("PAID", order_id)
                 )
 
-            # Commit all changes upon success
-            conn.commit()
-            return {
-                "id": payment_id,
-                "order_id": order_id,
-                "payment_amount": payment_amount,
-                "payment_method": payment_method,
-                "status": "SUCCESS"
-            }
+                conn.commit()
+                return True
         except Exception as e:
             conn.rollback()
             raise e
@@ -70,21 +82,17 @@ class PaymentDAO:
             conn.close()
 
     @staticmethod
-    def get_payment_by_order_id(order_id: str, username: str) -> dict | None:
-        """
-        Fetches payment history for a specific order.
-        Verifies ownership via orders table JOIN.
-        """
-        sql = """
-            SELECT p.id, p.order_id, p.payment_amount, p.payment_method, p.payment_time, p.status
-            FROM payments p
-            JOIN orders o ON p.order_id = o.order_id
-            WHERE p.order_id = %s AND o.username = %s
-        """
+    def get_payment_by_order_id(order_id: str) -> list:
+        """Retrieves payment history for a specific order."""
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute(sql, (order_id, username))
-                return cursor.fetchone()
+                cursor.execute(
+                    "SELECT * FROM payments WHERE order_id = %s",
+                    (order_id,)
+                )
+                return cursor.fetchall()
+        except Exception as e:
+            raise e
         finally:
             conn.close()

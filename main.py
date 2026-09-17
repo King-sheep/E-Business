@@ -12,6 +12,9 @@ from api.register_api import router as register_router
 from api.products_api import router as products_router
 from api.orders_api import router as orders_router
 from api.payment_api import router as payment_router
+from utils.exception_handlers import register_exception_handlers
+
+
 
 
 # Initialize FastAPI application with Swagger metadata
@@ -30,6 +33,10 @@ app = FastAPI(
     docs_url="/docs",      # Interactive Swagger UI route
     redoc_url="/redoc"     # Alternative ReDoc documentation route
 )
+
+#==================Global Exception Handler==========================
+register_exception_handlers(app)
+
 
 
 """

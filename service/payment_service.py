@@ -12,41 +12,31 @@ from utils.logger import logger
 
 
 
-
 class PaymentService:
 
     @staticmethod
-    def process_payment(username: str, data: PaymentCreateRequest):
-        logger.info(f"Service: Initiating payment for order ID '{data.order_id}' by user '{username}' using method '{data.payment_method}'.")
-        """Processes payment for an order and returns structured response."""
-        result = PaymentDAO.execute_payment_transaction(
-            order_id=data.order_id,
+    def pay_order(username: str, data: PaymentCreateRequest):
+        """Processes payment for an existing unpaid order."""
+        logger.info(f"Service: User '{username}' attempting to pay for order '{data.order_id}' with amount {data.payment_amount}.")
+        
+        success_flag = PaymentDAO.process_payment_transaction(
             username=username,
-            payment_method=data.payment_method
+            order_id=data.order_id,
+            payment_method=data.payment_method,
+            payment_amount=data.payment_amount
         )
-        if result:
-            logger.info(f"Service: Payment transaction succeeded for order ID '{data.order_id}'.")
-            return success(data=result, msg="Payment executed successfully")
 
-        logger.warning(f"Service: Payment transaction failed for order ID '{data.order_id}' by user '{username}'.")
-        return fail(
-            msg="Payment failed: Order not found, unauthorized, or already paid",
-            code=400
-        )
+        if success_flag:
+            logger.info(f"Service: Payment succeeded for order '{data.order_id}' by user '{username}'.")
+            return success(msg="Payment processed successfully")
+
+        logger.warning(f"Service: Payment failed for order '{data.order_id}' by user '{username}'. Invalid status, wrong amount, or order not found.")
+        return fail(msg="Payment failed: invalid order, amount mismatch, or order already paid/cancelled", code=400)
+
 
     @staticmethod
-    def get_payment_info(username: str, order_id: str):
-        logger.info(f"Service: Querying payment info for order ID '{order_id}' by user '{username}'.")
-        """Queries payment record for a given order ID."""
-        payment = PaymentDAO.get_payment_by_order_id(order_id, username)
-
-        if payment:
-            # Convert decimal and datetime for clean serialization
-            payment["payment_amount"] = float(payment["payment_amount"])
-            payment["payment_time"] = str(payment["payment_time"])
-
-            logger.info(f"Service: Payment record retrieved successfully for order ID '{order_id}'.")
-            return success(data=payment, msg="Payment details retrieved successfully")
-
-        logger.warning(f"Service: Payment record not found for order ID '{order_id}' and user '{username}'.")
-        return fail(msg="Payment record not found for this order", code=404)
+    def get_payments(order_id: str):
+        """Retrieves payment details for an order."""
+        logger.info(f"Service: Fetching payment records for order '{order_id}'.")
+        payments = PaymentDAO.get_payment_by_order_id(order_id)
+        return success(data=payments, msg="Payment records retrieved successfully")
