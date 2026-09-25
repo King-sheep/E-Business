@@ -74,7 +74,7 @@ class OrdersDAO:
                 )
 
                 conn.commit()
-                return order_id
+                return order_id, total_amount
         except Exception as e:
             conn.rollback()
             raise e
@@ -88,7 +88,7 @@ class OrdersDAO:
         Rolls back all changes if any item lacks sufficient stock.
         """
         conn = get_db_connection()
-        created_order_ids = []
+        created_order_ids_amts = []
         try:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
@@ -138,10 +138,10 @@ class OrdersDAO:
                         """,
                         order_items_to_insert
                     )
-                    created_order_ids.append(order_id)
+                    created_order_ids_amts.append({"order_id":order_id, "total_amount": total_amount})
 
                 conn.commit()
-                return created_order_ids
+                return created_order_ids_amts
         except Exception as e:
             conn.rollback()
             raise e
@@ -254,6 +254,7 @@ class OrdersDAO:
             raise e
         finally:
             conn.close()
+            
 
     @staticmethod
     def batch_get_orders_detail(order_ids: list, username: str) -> list:

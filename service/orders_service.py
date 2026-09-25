@@ -19,18 +19,18 @@ class OrdersService:
     def create_order(username: str, data: OrderCreateRequest):
         """Handles single order creation."""
         logger.info(f"Service: User '{username}' creating a single order.")
-        order_id = OrdersDAO.create_order_transaction(username, data.items)
+        order_id, total_amount = OrdersDAO.create_order_transaction(username, data.items)
         if order_id:
-            return success(data={"order_id": order_id, "status": "PENDING_PAY"}, msg="Order created successfully")
+            return success(data={"order_id": order_id, "total_amount": total_amount, "status": "PENDING_PAY"}, msg="Order created successfully")
         return fail(msg="Failed to create order: out of stock or product not found", code=400)
 
     @staticmethod
     def batch_create_orders(username: str, data: BatchOrderCreateRequest):
         """Handles batch order creation."""
         logger.info(f"Service: User '{username}' batch creating orders.")
-        order_ids = OrdersDAO.batch_create_orders_transaction(username, data.orders)
-        if order_ids:
-            return success(data={"order_ids": order_ids}, msg="Batch orders created successfully")
+        order_ids_amts = OrdersDAO.batch_create_orders_transaction(username, data.orders)
+        if order_ids_amts:
+            return success(data={"order_ids_amts": order_ids_amts}, msg="Batch orders created successfully")
         return fail(msg="Batch creation failed: stock insufficient", code=400)
 
     @staticmethod

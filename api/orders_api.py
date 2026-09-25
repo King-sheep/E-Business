@@ -28,13 +28,13 @@ router = APIRouter(prefix="/orders", tags=["Order Management"])
 
 
 
-@router.post("", response_model=BaseResponse)
+@router.post("/add", response_model=BaseResponse)
 def create_order_api(data: OrderCreateRequest, current_user: str = Depends(get_current_user)):
     """Creates a single order with inventory locking and transaction control."""
     logger.info(f"API: Single order creation requested by '{current_user}'")
     return OrdersService.create_order(username=current_user, data=data)
 
-@router.post("/batch", response_model=BaseResponse)
+@router.post("/batch-add", response_model=BaseResponse)
 def batch_create_orders_api(data: BatchOrderCreateRequest, current_user: str = Depends(get_current_user)):
     """Creates multiple orders in a single atomic transaction (Batch Create)."""
     logger.info(f"API: Batch order creation requested by '{current_user}'")

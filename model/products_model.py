@@ -4,13 +4,13 @@
 # @Description: products_model.py
 
 
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, Field
 from typing import Optional, List, Annotated, Any
 
 
 
 
-# 1. Define a centralized helper function to clean empty strings/lists into None
+# Define a centralized helper function to clean empty strings/lists into None
 def convert_empty_to_none(v: Any) -> Any:
     if isinstance(v, str) and v.strip() == "":
         return None
@@ -30,28 +30,32 @@ OptionalIds = Annotated[list[int] | None, BeforeValidator(convert_empty_to_none)
 # Request Models
 # ==========================================
 
-# Base Class with strict types, but safely handles empty inputs
+# 1. Base Class now uses safe optional types with empty-string converter
 class ProductBase(BaseModel):
+    """Base model for product containing flexible optional fields."""
     name: OptionalStr = None
     price: OptionalFloat = None
     stock: OptionalInt = None
     description: OptionalStr = None
 
 
-# Request model for creating a new product (Strictly requires valid types)
-class ProductCreate(ProductBase):
-    name: str  # Required for creation
-    price: float  # Required for creation
-    stock: int = 1
+# 2. For create/update, you can inherit or explicitly enforce strict required fields
+class ProductCreate(BaseModel):
+    """Request model for creating a new product (Strictly required fields)."""
+    name: str = Field(..., min_length=1, description="Product name cannot be empty")
+    price: float = Field(..., gt=0, description="Price must be greater than 0")
+    stock: int = Field(..., ge=0, description="Stock cannot be negative")
+    description: str = Field(..., min_length=1, description="Description cannot be empty")
 
 
-# Request model for updating an existing product
-class ProductsRequestUpdate(ProductBase):
-    id: int
+class ProductsRequestUpdate(ProductCreate):
+    """Request model for updating an existing product."""
+    id: int = Field(..., description="Product ID is required for update")
 
 
-# Request model for querying products (All fields strict yet optional for full scan)
+# 3. Query model inherits from ProductBase, perfectly supporting empty strings -> None
 class ProductQuery(ProductBase):
+    """Request model for querying products (All fields optional for full scan)."""
     ids: OptionalIds = None
 
 
