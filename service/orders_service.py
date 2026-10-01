@@ -19,19 +19,29 @@ class OrdersService:
     def create_order(username: str, data: OrderCreateRequest):
         """Handles single order creation."""
         logger.info(f"Service: User '{username}' creating a single order.")
-        order_id, total_amount = OrdersDAO.create_order_transaction(username, data.items)
-        if order_id:
-            return success(data={"order_id": order_id, "total_amount": total_amount, "status": "PENDING_PAY"}, msg="Order created successfully")
-        return fail(msg="Failed to create order: out of stock or product not found", code=400)
+
+        try:
+            order_id, total_amount = OrdersDAO.create_order_transaction(username, data.items)
+            if order_id:
+                return success(data={"order_id": order_id, "total_amount": total_amount, "status": "PENDING_PAY"}, msg="Order created successfully")
+            return fail(msg="Failed to create order: out of stock or product not found", code=400)
+        except Exception as e:
+            logger.error(f"Create order exception: {str(e)}")
+            return fail(msg=f"Failed to create order: {str(e)}", code=400)
 
     @staticmethod
     def batch_create_orders(username: str, data: BatchOrderCreateRequest):
         """Handles batch order creation."""
         logger.info(f"Service: User '{username}' batch creating orders.")
-        order_ids_amts = OrdersDAO.batch_create_orders_transaction(username, data.orders)
-        if order_ids_amts:
-            return success(data={"order_ids_amts": order_ids_amts}, msg="Batch orders created successfully")
-        return fail(msg="Batch creation failed: stock insufficient", code=400)
+
+        try: 
+            order_ids_amts = OrdersDAO.batch_create_orders_transaction(username, data.orders)
+            if order_ids_amts:
+                return success(data={"order_ids_amts": order_ids_amts}, msg="Batch orders created successfully")
+            return fail(msg="Batch creation failed: stock insufficient", code=400)
+        except Exception as e:
+            logger.error(f"Create order exception: {str(e)}")
+            return fail(msg=f"Failed to create order: {str(e)}", code=400)
 
     @staticmethod
     def cancel_order(username: str, order_id: str):
